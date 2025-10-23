@@ -1269,39 +1269,8 @@ Private Function ExtractValue(ByVal doc As Document, ByVal keyLabel As String) A
 End Function
 
 ' ============================================================================
-' SETTINGS
+' DIAGNOSTIC
 ' ============================================================================
-
-Public Sub BWS_Settings()
-    Dim base As String, templ As String, drafts As String, autoOpen As String
-
-    base = GetBasePath(False)
-    If LenB(base) = 0 Then
-        base = PickFolder("Pick your Dropbox base folder")
-        If LenB(base) > 0 Then SaveSettingStr "BasePath", base
-    End If
-
-    drafts = GetDraftsPath(False)
-    If LenB(drafts) = 0 And LenB(base) > 0 Then
-        drafts = CombinePath(base, "Drafts")
-        If EnsureFolder(drafts) Then SaveSettingStr "DraftsPath", drafts
-    End If
-
-    templ = GetTemplatePath(False)
-    If LenB(templ) = 0 Then
-        templ = PickFile("Pick your letterhead template", "*.dotm; *.dotx")
-        If LenB(templ) > 0 Then SaveSettingStr "TemplatePath", templ
-    End If
-
-    autoOpen = GetSettingStr("AutoOpenFolder", "False")
-    If MsgBox("Auto-open folder after save? Current: " & autoOpen, vbYesNo + vbQuestion, "BWS") = vbYes Then
-        SaveSettingStr "AutoOpenFolder", "True"
-    Else
-        SaveSettingStr "AutoOpenFolder", "False"
-    End If
-
-    MsgBox Ver() & " settings updated.", vbInformation, "BWS"
-End Sub
 
 Public Sub BWS_Diagnostic()
     Dim msg As String
