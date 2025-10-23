@@ -2,16 +2,21 @@ Attribute VB_Name = "BWS_Module"
 Option Explicit
 
 ' ============================================================================
-' Bridgewater Studio - BWS Ultimate v8.0.2 FIXED
+' Bridgewater Studio - BWS Ultimate v8.0.3
 ' Complete feature set: persistent 3-row toolbar, all formatting, toggleable bullets
-' Based on: v8.0.1 STABLE + proven patterns from project knowledge
-' v8.0.2 BUGFIX: Added missing t.Range.ParagraphFormat.LeftIndent = 0 for proper table cell padding
+' Based on: v8.0.2 FIXED + document formatting improvements
+' v8.0.3 IMPROVEMENTS:
+'   - Fixed hanging indent: removed from regular paragraphs, kept only on bullets
+'   - Fixed bullet alignment: first line and hanging indent now align vertically
+'   - Added BWS Heading style application for Experience Strategy Rationale
+'   - Fixed signature image wrapping to "in front of text"
+'   - Fixed table alignment: only currency columns right-aligned, all others left-aligned
 ' ============================================================================
 
 ' -------- Versioning / App Keys --------
 Private Const BWS_APP_NAME As String = "BridgewaterStudio"
 Private Const BWS_APP_SECTION As String = "BWS"
-Public  Const BWS_VERSION   As String = "Ultimate v8.0.2 FIXED"
+Public  Const BWS_VERSION   As String = "Ultimate v8.0.3"
 
 ' -------- Registry Keys --------
 Private Const BWS_REG_APP As String = "BridgewaterStudio"
@@ -19,8 +24,8 @@ Private Const BWS_REG_SECTION As String = "BWS"
 Private Const BWS_REG_BULLET_CONVERT As String = "BulletConversionEnabled"
 
 ' -------- Formatting prefs --------
-Private Const BULLET_LEFT_IN As Double = 0.25
-Private Const BULLET_HANG_IN As Double = 0.5
+Private Const BULLET_LEFT_IN As Double = 0.5
+Private Const BULLET_HANG_IN As Double = 0.25
 Private Const BULLET_TAB_IN  As Double = 0.5
 Private Const FONT_NAME_PREF As String = "Roboto"
 Private Const FONT_SIZE_PREF As Single = 11
@@ -406,7 +411,10 @@ Private Sub ImportDocument(ByVal sourcePath As String)
     ' 4. Apply formatting
     ApplyGlobalFormatting doc
 
-    ' 5. Convert bullets LAST (and only if enabled)
+    ' 5. Fix signature image wrapping
+    FixSignatureImageWrapping doc
+
+    ' 6. Convert bullets LAST (and only if enabled)
     Dim bulletsEnabled As String
     bulletsEnabled = GetSettingStr(BWS_REG_BULLET_CONVERT, "Yes")
     If bulletsEnabled = "Yes" Then
@@ -461,6 +469,11 @@ Public Sub BWS_FixBullets()
             End With
             para.Range.ParagraphFormat.TabStops.ClearAll
             para.Range.ParagraphFormat.TabStops.Add Position:=InchesToPoints(BULLET_TAB_IN)
+        Else
+            ' Remove hanging indent from non-bullet paragraphs
+            With para.Range.ParagraphFormat
+                .FirstLineIndent = 0
+            End With
         End If
     Next para
 
@@ -483,6 +496,11 @@ Private Sub ConvertTextBulletsToRealBullets(ByVal doc As Document)
                     With para.Range.ParagraphFormat
                         .LeftIndent = InchesToPoints(BULLET_LEFT_IN)
                         .FirstLineIndent = InchesToPoints(-BULLET_HANG_IN)
+                    End With
+                Else
+                    ' Ensure non-bullet paragraphs have no hanging indent
+                    With para.Range.ParagraphFormat
+                        .FirstLineIndent = 0
                     End With
                 End If
             End If
@@ -567,10 +585,10 @@ Private Sub FormatTable(ByVal t As Table)
         End If
     Next i
 
-    ' Column alignment - right-align numeric columns (using .Select pattern)
+    ' Column alignment - right-align only currency columns (using .Select pattern)
     Dim c As Long
     For c = 1 To t.Columns.Count
-        If IsNumericColumn(t, c) Then
+        If IsCurrencyColumn(t, c) Then
             t.Columns(c).Select
             Selection.Range.ParagraphFormat.Alignment = wdAlignParagraphRight
         Else
@@ -582,14 +600,14 @@ Private Sub FormatTable(ByVal t As Table)
     On Error GoTo 0
 End Sub
 
-Private Function IsNumericColumn(ByVal t As Table, ByVal colIndex As Long) As Boolean
+Private Function IsCurrencyColumn(ByVal t As Table, ByVal colIndex As Long) As Boolean
     Dim r As Long
     Dim cellText As String
-    Dim numericCount As Long
+    Dim currencyCount As Long
     Dim nonEmptyCount As Long
     Dim val As Double
 
-    numericCount = 0
+    currencyCount = 0
     nonEmptyCount = 0
 
     For r = 2 To t.Rows.Count  ' Skip header
@@ -600,17 +618,18 @@ Private Function IsNumericColumn(ByVal t As Table, ByVal colIndex As Long) As Bo
 
         If Len(cellText) > 0 Then
             nonEmptyCount = nonEmptyCount + 1
-            If TryParseCurrency(cellText, val) Then
-                numericCount = numericCount + 1
+            ' Check if cell contains currency symbol ($)
+            If InStr(cellText, "$") > 0 And TryParseCurrency(cellText, val) Then
+                currencyCount = currencyCount + 1
             End If
         End If
         On Error GoTo 0
     Next r
 
     If nonEmptyCount > 0 Then
-        IsNumericColumn = (numericCount / nonEmptyCount) >= NUMERIC_COL_THRESHOLD
+        IsCurrencyColumn = (currencyCount / nonEmptyCount) >= NUMERIC_COL_THRESHOLD
     Else
-        IsNumericColumn = False
+        IsCurrencyColumn = False
     End If
 End Function
 
@@ -668,6 +687,16 @@ Public Sub BWS_ApplyFormatting()
     MsgBox "Formatting applied!", vbInformation, "BWS"
 End Sub
 
+Public Sub BWS_ApplyHeadingStyles()
+    ApplyBWSHeadingStyles ActiveDocument
+    MsgBox "BWS Heading styles applied!", vbInformation, "BWS"
+End Sub
+
+Public Sub BWS_FixSignatureWrapping()
+    FixSignatureImageWrapping ActiveDocument
+    MsgBox "Signature image wrapping fixed!", vbInformation, "BWS"
+End Sub
+
 Private Sub ApplyGlobalFormatting(ByVal doc As Document)
     On Error Resume Next
 
@@ -686,7 +715,83 @@ Private Sub ApplyGlobalFormatting(ByVal doc As Document)
         .ParagraphFormat.SpaceBefore = 0
         .ParagraphFormat.SpaceAfter = 6
         .ParagraphFormat.LineSpacingRule = wdLineSpaceSingle
+        .ParagraphFormat.FirstLineIndent = 0
+        .ParagraphFormat.LeftIndent = 0
     End With
+
+    On Error GoTo 0
+End Sub
+
+Private Sub ApplyBWSHeadingStyles(ByVal doc As Document)
+    Dim para As Paragraph
+    Dim txt As String
+    Dim inSection As Boolean
+    Dim bwsHeadingExists As Boolean
+
+    On Error Resume Next
+
+    ' Check if BWS Heading style exists
+    bwsHeadingExists = False
+    Dim sty As Style
+    For Each sty In doc.Styles
+        If sty.NameLocal = "BWS Heading" Or sty.NameLocal = "BWS_Heading" Then
+            bwsHeadingExists = True
+            Exit For
+        End If
+    Next sty
+
+    If Not bwsHeadingExists Then
+        MsgBox "BWS Heading style not found in template.", vbExclamation, "BWS"
+        Exit Sub
+    End If
+
+    inSection = False
+
+    ' Find Experience Strategy Rationale section and apply BWS Heading to appropriate paragraphs
+    For Each para In doc.Paragraphs
+        txt = Trim$(para.Range.Text)
+
+        ' Check if we're entering the section
+        If InStr(1, txt, "Experience Strategy Rationale", vbTextCompare) > 0 Then
+            inSection = True
+        ElseIf inSection Then
+            ' Check if we've left the section (next major heading)
+            If Len(txt) > 0 And para.Range.Font.Bold And _
+               (InStr(1, txt, "Executive Summary", vbTextCompare) > 0 Or _
+                InStr(1, txt, "Timeline", vbTextCompare) > 0 Or _
+                InStr(1, txt, "Budget", vbTextCompare) > 0 Or _
+                InStr(1, txt, "Deliverables", vbTextCompare) > 0) Then
+                inSection = False
+            ElseIf Len(txt) > 0 And para.Range.ListFormat.ListType = wdListNoNumbering Then
+                ' Apply BWS Heading style to non-bullet, non-empty paragraphs that look like headings
+                ' (typically shorter lines, may be bold, not full sentences)
+                If Len(txt) < 100 And Not InStr(txt, ".") > 0 Then
+                    para.Range.Style = "BWS Heading"
+                End If
+            End If
+        End If
+    Next para
+
+    On Error GoTo 0
+End Sub
+
+Private Sub FixSignatureImageWrapping(ByVal doc As Document)
+    Dim shp As InlineShape
+    Dim newShp As Shape
+
+    On Error Resume Next
+
+    ' Find inline images and convert them to floating with "In Front of Text" wrapping
+    For Each shp In doc.InlineShapes
+        If shp.Type = wdInlineShapePicture Or shp.Type = wdInlineShapeLinkedPicture Then
+            ' Convert inline shape to floating shape
+            Set newShp = shp.ConvertToShape
+            If Not newShp Is Nothing Then
+                ' Set wrapping to "In Front of Text"
+                newShp.WrapFormat.Type = 3 ' wdWrapFront = 3
+            End If
+        End If
+    Next shp
 
     On Error GoTo 0
 End Sub
