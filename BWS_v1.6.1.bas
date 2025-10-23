@@ -533,6 +533,8 @@ Private Sub FormatSignatureBlock(ByVal doc As Document)
     Dim sigStart As Paragraph
     Dim lineCount As Long
     Dim i As Long
+    Dim shp As InlineShape
+    Dim fltShp As Shape
 
     On Error Resume Next
 
@@ -564,10 +566,8 @@ Private Sub FormatSignatureBlock(ByVal doc As Document)
                 End With
 
                 ' Fix image wrapping in signature block - set to "In Front of Text"
-                Dim shp As InlineShape
                 For Each shp In para.Range.InlineShapes
                     If shp.Type = wdInlineShapePicture Or shp.Type = wdInlineShapeLinkedPicture Then
-                        Dim fltShp As Shape
                         Set fltShp = shp.ConvertToShape
                         fltShp.WrapFormat.Type = wdWrapInFrontOfText
                         fltShp.ZOrder msoSendToFront
