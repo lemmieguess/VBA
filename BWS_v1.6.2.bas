@@ -2,8 +2,14 @@ Attribute VB_Name = "BWS_Module"
 Option Explicit
 
 ' ============================================================================
-' Bridgewater Studio - BWS v1.6.2 - Configuration Memory Enhancement
-' Based on: v1.6.1 with installer usability improvement
+' Bridgewater Studio - BWS v1.6.3 - Formatting Refinements
+' Based on: v1.6.2 with multiple formatting fixes
+'
+' v1.6.3 FIXES:
+' - Fixed bullet hanging indent: Now aligns vertically (0.25" both)
+' - Fixed table alignment: Left-align all columns except currency
+' - Fixed signature image wrapping: Now "In Front of Text"
+' - Added BWS Header style to Executive Summary sections
 '
 ' v1.6.2 ENHANCEMENT:
 ' - Installer now remembers existing configuration
@@ -27,7 +33,7 @@ Option Explicit
 ' -------- Versioning / App Keys --------
 Private Const BWS_APP_NAME As String = "BridgewaterStudio"
 Private Const BWS_APP_SECTION As String = "BWS"
-Public  Const BWS_VERSION   As String = "v1.6.2"
+Public  Const BWS_VERSION   As String = "v1.6.3"
 
 ' -------- Registry Keys --------
 Private Const BWS_REG_APP As String = "BridgewaterStudio"
@@ -36,7 +42,7 @@ Private Const BWS_REG_BULLET_CONVERT As String = "BulletConversionEnabled"
 
 ' -------- Formatting prefs --------
 Private Const BULLET_LEFT_IN As Double = 0.25
-Private Const BULLET_HANG_IN As Double = 0.5
+Private Const BULLET_HANG_IN As Double = 0.25
 Private Const BULLET_TAB_IN  As Double = 0.5
 Private Const FONT_NAME_PREF As String = "Roboto"
 Private Const BULLET_FONT As String = "Calibri"  ' NEW v1.6: Story 2
@@ -124,7 +130,7 @@ Public Sub BWS_Install()
 
     ' If no existing settings or user chose to reconfigure
     If Not useExisting Then
-        MsgBox "Welcome to BWS v1.6.2 Installer!" & vbCrLf & vbCrLf & _
+        MsgBox "Welcome to BWS v1.6.3 Installer!" & vbCrLf & vbCrLf & _
                "You'll be prompted to select:" & vbCrLf & _
                "1. Base folder (Dropbox root)" & vbCrLf & _
                "2. Template file (.dotm/.dotx)" & vbCrLf & vbCrLf & _
@@ -557,6 +563,17 @@ Private Sub FormatSignatureBlock(ByVal doc As Document)
                     .SpaceAfter = 6
                 End With
 
+                ' Fix image wrapping in signature block - set to "In Front of Text"
+                Dim shp As InlineShape
+                For Each shp In para.Range.InlineShapes
+                    If shp.Type = wdInlineShapePicture Or shp.Type = wdInlineShapeLinkedPicture Then
+                        Dim fltShp As Shape
+                        Set fltShp = shp.ConvertToShape
+                        fltShp.WrapFormat.Type = wdWrapInFrontOfText
+                        fltShp.ZOrder msoSendToFront
+                    End If
+                Next shp
+
                 ' Last line of signature block gets 0pt space after
                 If lineCount = 3 Then
                     para.Range.ParagraphFormat.SpaceAfter = 0
@@ -767,14 +784,13 @@ Private Sub FormatTable(ByVal t As Table)
         End If
     Next i
 
-    ' Column alignment - right-align numeric columns (using .Select pattern)
+    ' Column alignment - left-align all by default, right-align ONLY currency columns
     Dim c As Long
     For c = 1 To t.Columns.Count
-        If IsNumericColumn(t, c) Then
-            t.Columns(c).Select
+        t.Columns(c).Select
+        If IsCurrencyColumn(t, c) Then
             Selection.Range.ParagraphFormat.Alignment = wdAlignParagraphRight
         Else
-            t.Columns(c).Select
             Selection.Range.ParagraphFormat.Alignment = wdAlignParagraphLeft
         End If
     Next c
@@ -782,14 +798,14 @@ Private Sub FormatTable(ByVal t As Table)
     On Error GoTo 0
 End Sub
 
-Private Function IsNumericColumn(ByVal t As Table, ByVal colIndex As Long) As Boolean
+Private Function IsCurrencyColumn(ByVal t As Table, ByVal colIndex As Long) As Boolean
+    ' Only returns True if column contains currency symbols ($, €, £, etc.)
     Dim r As Long
     Dim cellText As String
-    Dim numericCount As Long
+    Dim currencyCount As Long
     Dim nonEmptyCount As Long
-    Dim val As Double
 
-    numericCount = 0
+    currencyCount = 0
     nonEmptyCount = 0
 
     For r = 2 To t.Rows.Count  ' Skip header
@@ -800,17 +816,22 @@ Private Function IsNumericColumn(ByVal t As Table, ByVal colIndex As Long) As Bo
 
         If Len(cellText) > 0 Then
             nonEmptyCount = nonEmptyCount + 1
-            If TryParseCurrency(cellText, val) Then
-                numericCount = numericCount + 1
+            ' Check if cell contains currency symbols
+            If InStr(cellText, "$") > 0 Or _
+               InStr(cellText, "€") > 0 Or _
+               InStr(cellText, "£") > 0 Or _
+               InStr(cellText, "¥") > 0 Then
+                currencyCount = currencyCount + 1
             End If
         End If
         On Error GoTo 0
     Next r
 
+    ' Column is currency if >= 50% of non-empty cells have currency symbols
     If nonEmptyCount > 0 Then
-        IsNumericColumn = (numericCount / nonEmptyCount) >= NUMERIC_COL_THRESHOLD
+        IsCurrencyColumn = (currencyCount / nonEmptyCount) >= 0.5
     Else
-        IsNumericColumn = False
+        IsCurrencyColumn = False
     End If
 End Function
 
@@ -902,16 +923,52 @@ End Sub
 Private Sub ApplyHeaderStyles(ByVal doc As Document)
     ' Story 6: Apply BWS Header style with single line spacing
     ' Detect likely headers (larger font, standalone lines, etc.)
+    ' Also apply "BWS Header" style to Executive Summary section headings
 
     Dim para As Paragraph
     Dim txt As String
+    Dim inExecSummary As Boolean
+    Dim bwsHeaderStyleExists As Boolean
 
     On Error Resume Next
+
+    ' Check if BWS Header style exists in template
+    bwsHeaderStyleExists = False
+    Dim testStyle As Style
+    Set testStyle = doc.Styles("BWS Header")
+    If Not testStyle Is Nothing Then
+        bwsHeaderStyleExists = True
+    End If
+    On Error GoTo 0
+
+    inExecSummary = False
 
     For Each para In doc.Paragraphs
         txt = Trim$(para.Range.Text)
 
-        ' Simple heuristic: if font is larger than body or text is all caps and short
+        On Error Resume Next
+
+        ' Track if we're in Executive Summary or Experience Strategy Rationale sections
+        If InStr(1, txt, "Executive Summary", vbTextCompare) > 0 Or _
+           InStr(1, txt, "Experience Strategy", vbTextCompare) > 0 Or _
+           InStr(1, txt, "Rationale", vbTextCompare) > 0 Then
+            inExecSummary = True
+        ElseIf InStr(1, txt, "Proposal", vbTextCompare) > 0 Or _
+               InStr(1, txt, "Timeline", vbTextCompare) > 0 Or _
+               InStr(1, txt, "Budget", vbTextCompare) > 0 Then
+            inExecSummary = False
+        End If
+
+        ' Apply BWS Header style to headings in Executive Summary sections
+        If inExecSummary And bwsHeaderStyleExists Then
+            ' Detect headings: short lines, ending with ":", or all caps
+            If Len(txt) > 0 And Len(txt) < 80 And _
+               (Right$(txt, 1) = ":" Or txt = UCase$(txt) Or para.Range.Font.Bold = True) Then
+                para.Style = doc.Styles("BWS Header")
+            End If
+        End If
+
+        ' Apply general header formatting for large/caps/bold text
         If para.Range.Font.Size >= 14 Or _
            (Len(txt) > 0 And Len(txt) < 100 And txt = UCase$(txt) And para.Range.Font.Bold = True) Then
 
@@ -928,9 +985,9 @@ Private Sub ApplyHeaderStyles(ByVal doc As Document)
                 .SpaceBefore = 12                     ' 12pt before for separation
             End With
         End If
-    Next para
 
-    On Error GoTo 0
+        On Error GoTo 0
+    Next para
 End Sub
 
 ' ============================================================================
@@ -1265,32 +1322,29 @@ Public Sub BWS_About()
     Dim msg As String
 
     ' Build message in parts to avoid VBA's 24-line-continuation limit
-    msg = "================ BWS v1.6.2 ==================" & vbCrLf _
+    msg = "================ BWS v1.6.3 ==================" & vbCrLf _
         & "Version: " & BWS_VERSION & vbCrLf _
         & "Host:    " & Application.Name & " " & Application.Version & vbCrLf _
         & vbCrLf _
-        & "NEW in v1.6.2:" & vbCrLf _
-        & "• Installer remembers configuration" & vbCrLf _
-        & "• No need to re-select folders on reinstall" & vbCrLf _
+        & "NEW in v1.6.3:" & vbCrLf _
+        & "• Fixed bullet hanging indent alignment" & vbCrLf _
+        & "• Currency-only table column alignment" & vbCrLf _
+        & "• Signature image wrapping (in front)" & vbCrLf _
+        & "• BWS Header style in Exec Summary" & vbCrLf _
         & vbCrLf _
-        & "From v1.6.1:" & vbCrLf _
-        & "• Fixed line spacing bug (276 twips)" & vbCrLf _
-        & vbCrLf _
-        & "Features from v1.6:" & vbCrLf _
-        & "• Signature block detection (0.125"" indent)" & vbCrLf
+        & "From v1.6.2:" & vbCrLf
 
-    msg = msg & "• Calibri font for bullets" & vbCrLf _
+    msg = msg & "• Installer remembers configuration" & vbCrLf _
+        & vbCrLf _
+        & "Core Features:" & vbCrLf _
+        & "• Line spacing: 276 twips (v1.6.1 fix)" & vbCrLf _
+        & "• Signature block: 0.125"" indent" & vbCrLf _
+        & "• Calibri font for bullets" & vbCrLf _
         & "• Auto page margins (-0.062"" top)" & vbCrLf _
         & "• Table headers: #D9D9D9 gray + bold" & vbCrLf _
         & "• Metadata formatting (0"" indent)" & vbCrLf _
-        & "• Header single line spacing" & vbCrLf _
-        & vbCrLf _
-        & "Features:" & vbCrLf _
         & "• 3-row persistent toolbar" & vbCrLf _
-        & "• Toggleable bullet conversion" & vbCrLf _
         & "• Smart table formatting" & vbCrLf _
-        & "• Column alignment detection" & vbCrLf _
-        & "• Auto folder opening" & vbCrLf _
         & "=============================================="
 
     MsgBox msg, vbInformation, "BWS"
