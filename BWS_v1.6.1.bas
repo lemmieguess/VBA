@@ -1263,6 +1263,8 @@ End Sub
 
 Public Sub BWS_About()
     Dim msg As String
+
+    ' Build message in parts to avoid VBA's 24-line-continuation limit
     msg = "================ BWS v1.6.2 ==================" & vbCrLf _
         & "Version: " & BWS_VERSION & vbCrLf _
         & "Host:    " & Application.Name & " " & Application.Version & vbCrLf _
@@ -1275,8 +1277,9 @@ Public Sub BWS_About()
         & "• Fixed line spacing bug (276 twips)" & vbCrLf _
         & vbCrLf _
         & "Features from v1.6:" & vbCrLf _
-        & "• Signature block detection (0.125"" indent)" & vbCrLf _
-        & "• Calibri font for bullets" & vbCrLf _
+        & "• Signature block detection (0.125"" indent)" & vbCrLf
+
+    msg = msg & "• Calibri font for bullets" & vbCrLf _
         & "• Auto page margins (-0.062"" top)" & vbCrLf _
         & "• Table headers: #D9D9D9 gray + bold" & vbCrLf _
         & "• Metadata formatting (0"" indent)" & vbCrLf _
@@ -1289,6 +1292,7 @@ Public Sub BWS_About()
         & "• Column alignment detection" & vbCrLf _
         & "• Auto folder opening" & vbCrLf _
         & "=============================================="
+
     MsgBox msg, vbInformation, "BWS"
 End Sub
 
