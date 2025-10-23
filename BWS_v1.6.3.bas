@@ -2,8 +2,14 @@ Attribute VB_Name = "BWS_Module"
 Option Explicit
 
 ' ============================================================================
-' Bridgewater Studio - BWS v1.6.3 - Formatting Refinements
-' Based on: v1.6.2 with multiple formatting fixes
+' Bridgewater Studio - BWS v1.6.4 - Bullet Indent & Settings
+' Based on: v1.6.3 with bullet alignment fix and settings function
+'
+' v1.6.4 FIXES & FEATURES:
+' - Fixed bullet indent: Removed hanging indent for vertical alignment
+'   Bullets and text now both align at 0.25" (no overhang)
+' - NEW: BWS_Settings() function to change configuration without reinstall
+'   Change base folder, drafts folder, template, auto-open, bullet conversion
 '
 ' v1.6.3 FIXES:
 ' - Fixed bullet hanging indent: Now aligns vertically (0.25" both)
@@ -33,7 +39,7 @@ Option Explicit
 ' -------- Versioning / App Keys --------
 Private Const BWS_APP_NAME As String = "BridgewaterStudio"
 Private Const BWS_APP_SECTION As String = "BWS"
-Public  Const BWS_VERSION   As String = "v1.6.3"
+Public  Const BWS_VERSION   As String = "v1.6.4"
 
 ' -------- Registry Keys --------
 Private Const BWS_REG_APP As String = "BridgewaterStudio"
@@ -130,7 +136,7 @@ Public Sub BWS_Install()
 
     ' If no existing settings or user chose to reconfigure
     If Not useExisting Then
-        MsgBox "Welcome to BWS v1.6.3 Installer!" & vbCrLf & vbCrLf & _
+        MsgBox "Welcome to BWS v1.6.4 Installer!" & vbCrLf & vbCrLf & _
                "You'll be prompted to select:" & vbCrLf & _
                "1. Base folder (Dropbox root)" & vbCrLf & _
                "2. Template file (.dotm/.dotx)" & vbCrLf & vbCrLf & _
@@ -165,6 +171,91 @@ Public Sub BWS_Install()
            "Drafts: " & drafts & vbCrLf & _
            "Template: " & templ & vbCrLf & vbCrLf & _
            "The BWS toolbar is now ready to use.", vbInformation, "BWS"
+End Sub
+
+' ============================================================================
+' SETTINGS - Manage BWS configuration without reinstalling
+' ============================================================================
+
+Public Sub BWS_Settings()
+    Dim choice As VbMsgBoxResult
+    Dim newValue As String
+    Dim currentBase As String, currentDrafts As String, currentTemplate As String
+    Dim currentAutoOpen As String, currentBullets As String
+
+    ' Get current settings
+    currentBase = GetSettingStr("BasePath", "(not set)")
+    currentDrafts = GetSettingStr("DraftsPath", "(not set)")
+    currentTemplate = GetSettingStr("TemplatePath", "(not set)")
+    currentAutoOpen = GetSettingStr("AutoOpenFolder", "False")
+    currentBullets = GetSettingStr(BWS_REG_BULLET_CONVERT, "Yes")
+
+    ' Show settings menu
+    Dim msg As String
+    msg = "BWS Settings" & vbCrLf & vbCrLf & _
+          "Current configuration:" & vbCrLf & _
+          "1. Base folder: " & currentBase & vbCrLf & _
+          "2. Drafts folder: " & currentDrafts & vbCrLf & _
+          "3. Template file: " & currentTemplate & vbCrLf & _
+          "4. Auto-open folder when saving: " & currentAutoOpen & vbCrLf & _
+          "5. Bullet conversion: " & currentBullets & vbCrLf & vbCrLf & _
+          "What would you like to change?" & vbCrLf & vbCrLf & _
+          "Enter 1-5 to change a setting, or click Cancel to exit."
+
+    newValue = InputBox(msg, "BWS Settings", "")
+    If LenB(newValue) = 0 Then Exit Sub
+
+    Select Case newValue
+        Case "1"  ' Base folder
+            newValue = PickFolder("Select new base folder (Dropbox root)")
+            If LenB(newValue) > 0 Then
+                SaveSettingStr "BasePath", newValue
+                MsgBox "Base folder updated to:" & vbCrLf & newValue, vbInformation, "BWS Settings"
+            End If
+
+        Case "2"  ' Drafts folder
+            newValue = PickFolder("Select new Drafts folder")
+            If LenB(newValue) > 0 Then
+                SaveSettingStr "DraftsPath", newValue
+                MsgBox "Drafts folder updated to:" & vbCrLf & newValue, vbInformation, "BWS Settings"
+            End If
+
+        Case "3"  ' Template
+            newValue = PickFile("Select new letterhead template", "*.dotm; *.dotx")
+            If LenB(newValue) > 0 Then
+                SaveSettingStr "TemplatePath", newValue
+                MsgBox "Template updated to:" & vbCrLf & newValue, vbInformation, "BWS Settings"
+            End If
+
+        Case "4"  ' Auto-open folder
+            choice = MsgBox("Auto-open folder when saving?" & vbCrLf & vbCrLf & _
+                           "Currently: " & currentAutoOpen & vbCrLf & vbCrLf & _
+                           "Click Yes to enable, No to disable.", _
+                           vbYesNoCancel + vbQuestion, "BWS Settings")
+            If choice = vbYes Then
+                SaveSettingStr "AutoOpenFolder", "True"
+                MsgBox "Auto-open folder enabled", vbInformation, "BWS Settings"
+            ElseIf choice = vbNo Then
+                SaveSettingStr "AutoOpenFolder", "False"
+                MsgBox "Auto-open folder disabled", vbInformation, "BWS Settings"
+            End If
+
+        Case "5"  ' Bullet conversion
+            choice = MsgBox("Enable automatic bullet conversion?" & vbCrLf & vbCrLf & _
+                           "Currently: " & currentBullets & vbCrLf & vbCrLf & _
+                           "Click Yes to enable, No to disable.", _
+                           vbYesNoCancel + vbQuestion, "BWS Settings")
+            If choice = vbYes Then
+                SaveSettingStr BWS_REG_BULLET_CONVERT, "Yes"
+                MsgBox "Bullet conversion enabled", vbInformation, "BWS Settings"
+            ElseIf choice = vbNo Then
+                SaveSettingStr BWS_REG_BULLET_CONVERT, "No"
+                MsgBox "Bullet conversion disabled", vbInformation, "BWS Settings"
+            End If
+
+        Case Else
+            MsgBox "Invalid choice. Please enter 1-5.", vbExclamation, "BWS Settings"
+    End Select
 End Sub
 
 ' ============================================================================
@@ -668,7 +759,7 @@ Public Sub BWS_FixBullets()
             End With
             With para.Range.ParagraphFormat
                 .LeftIndent = InchesToPoints(BULLET_LEFT_IN)
-                .FirstLineIndent = InchesToPoints(-BULLET_HANG_IN)
+                .FirstLineIndent = 0  ' No hanging indent - bullet and text align
             End With
             ' NEW v1.6: Story 2 - Force Calibri font for bullets
             para.Range.Font.Name = BULLET_FONT
@@ -695,7 +786,7 @@ Private Sub ConvertTextBulletsToRealBullets(ByVal doc As Document)
                     para.Range.ListFormat.ApplyBulletDefault
                     With para.Range.ParagraphFormat
                         .LeftIndent = InchesToPoints(BULLET_LEFT_IN)
-                        .FirstLineIndent = InchesToPoints(-BULLET_HANG_IN)
+                        .FirstLineIndent = 0  ' No hanging indent - bullet and text align
                     End With
                     ' NEW v1.6: Story 2 - Force Calibri font for bullets
                     para.Range.Font.Name = BULLET_FONT
@@ -1288,7 +1379,7 @@ Private Sub BuildOrRefreshBWSToolbar(ByVal showMessage As Boolean)
     AddBtn cb3, "About", "BWS_About", 487, False, MSO_BUTTON_ICON_AND_CAPTION, "Version info"
 
     If showMessage Then
-        MsgBox "BWS v1.6.1 toolbar installed!" & vbCrLf & vbCrLf & _
+        MsgBox "BWS v1.6.4 toolbar installed!" & vbCrLf & vbCrLf & _
                "3 persistent rows created." & vbCrLf & _
                "Toolbar will survive Word restart.", vbInformation, "BWS"
     End If
@@ -1322,19 +1413,21 @@ Public Sub BWS_About()
     Dim msg As String
 
     ' Build message in parts to avoid VBA's 24-line-continuation limit
-    msg = "================ BWS v1.6.3 ==================" & vbCrLf _
+    msg = "================ BWS v1.6.4 ==================" & vbCrLf _
         & "Version: " & BWS_VERSION & vbCrLf _
         & "Host:    " & Application.Name & " " & Application.Version & vbCrLf _
         & vbCrLf _
-        & "NEW in v1.6.3:" & vbCrLf _
-        & "• Fixed bullet hanging indent alignment" & vbCrLf _
-        & "• Currency-only table column alignment" & vbCrLf _
-        & "• Signature image wrapping (in front)" & vbCrLf _
-        & "• BWS Header style in Exec Summary" & vbCrLf _
+        & "NEW in v1.6.4:" & vbCrLf _
+        & "• Bullet alignment: No hanging indent" & vbCrLf _
+        & "• Settings button: Change config easily" & vbCrLf _
+        & vbCrLf _
+        & "From v1.6.3:" & vbCrLf _
+        & "• Currency-only table alignment" & vbCrLf _
+        & "• Signature image in front of text" & vbCrLf _
         & vbCrLf _
         & "From v1.6.2:" & vbCrLf
 
-    msg = msg & "• Installer remembers configuration" & vbCrLf _
+    msg = msg & "• Config memory in installer" & vbCrLf _
         & vbCrLf _
         & "Core Features:" & vbCrLf _
         & "• Line spacing: 276 twips (v1.6.1 fix)" & vbCrLf _
