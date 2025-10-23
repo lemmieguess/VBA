@@ -569,7 +569,7 @@ Private Sub FormatSignatureBlock(ByVal doc As Document)
                 For Each shp In para.Range.InlineShapes
                     If shp.Type = wdInlineShapePicture Or shp.Type = wdInlineShapeLinkedPicture Then
                         Set fltShp = shp.ConvertToShape
-                        fltShp.WrapFormat.Type = wdWrapInFrontOfText
+                        fltShp.WrapFormat.Type = wdWrapFront
                         fltShp.ZOrder msoBringToFront
                     End If
                 Next shp
