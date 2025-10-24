@@ -701,6 +701,7 @@ Private Sub FormatSignatureBlock(ByVal doc As Document)
     Dim cc As ContentControl
     Dim shp As InlineShape
     Dim fltShp As Shape
+    Dim shpItem As Shape
     Dim sigCC As ContentControl
     Dim bodyCC As ContentControl
     Dim para As Paragraph
@@ -709,25 +710,47 @@ Private Sub FormatSignatureBlock(ByVal doc As Document)
     Dim i As Long
     Dim startPara As Paragraph
     Dim deleteRange As Range
-    Dim isInSigWrapper As Boolean
     Dim tooCloseToSig As Boolean
+    Dim sigParas() As Paragraph
+    Dim paraCount As Long
+    Dim idx As Long
+    Dim trimmedText As String
 
     On Error Resume Next
 
     ' STEP 0: Find signature wrapper FIRST to know where NOT to delete
     Set sigCC = Nothing
+
+    ' STEP 0a: Delete any signature wrappers that live inside the body content control
+    Set bodyCC = FindBodyContentControl(doc, False)
+
     For Each cc In doc.ContentControls
         If InStr(1, cc.Title, "signature", vbTextCompare) > 0 Or _
            InStr(1, cc.Tag, "signature", vbTextCompare) > 0 Or _
            InStr(1, cc.Title, "SignatureBlock", vbTextCompare) > 0 Or _
            InStr(1, cc.Tag, "SignatureBlock", vbTextCompare) > 0 Then
-            Set sigCC = cc
-            Exit For
+
+            ' If this signature wrapper is inside the body content control, delete it
+            If Not bodyCC Is Nothing Then
+                If cc.Range.Start >= bodyCC.Range.Start And _
+                   cc.Range.End <= bodyCC.Range.End Then
+                    cc.Delete False
+                    GoTo NextCC
+                End If
+            End If
+
+            ' First signature wrapper that isn't inside the body becomes the keeper
+            If sigCC Is Nothing Then
+                Set sigCC = cc
+            End If
         End If
+NextCC:
     Next cc
 
-    ' STEP 1: Remove imported signatures from body content
+    ' Refresh bodyCC after potential deletions
     Set bodyCC = FindBodyContentControl(doc, False)
+
+    ' STEP 1: Remove imported signatures from body content
     If Not bodyCC Is Nothing Then
         Set parasToDelete = New Collection
 
@@ -796,7 +819,7 @@ Private Sub FormatSignatureBlock(ByVal doc As Document)
     ' STEP 2: Fix image formatting in template signature wrapper
     ' (sigCC is already set from STEP 0)
     If Not sigCC Is Nothing Then
-        ' Fix all images in signature wrapper to be "in front of text"
+        ' Fix all inline images in signature wrapper to be "in front of text"
         For Each shp In sigCC.Range.InlineShapes
             If shp.Type = wdInlineShapePicture Or shp.Type = wdInlineShapeLinkedPicture Then
                 Set fltShp = shp.ConvertToShape
@@ -804,6 +827,35 @@ Private Sub FormatSignatureBlock(ByVal doc As Document)
                 fltShp.ZOrder msoBringToFront  ' In front of text
             End If
         Next shp
+
+        ' Ensure any pre-existing floating shapes also use "in front of text"
+        On Error Resume Next
+        For Each shpItem In sigCC.Range.ShapeRange
+            shpItem.WrapFormat.Type = wdWrapFront
+            shpItem.ZOrder msoBringToFront
+        Next shpItem
+        On Error GoTo 0
+
+        ' Ensure at least one blank line exists between "Sincerely" and the signer name
+        paraCount = sigCC.Range.Paragraphs.Count
+        If paraCount > 1 Then
+            ReDim sigParas(1 To paraCount)
+            idx = 1
+            For Each para In sigCC.Range.Paragraphs
+                Set sigParas(idx) = para
+                idx = idx + 1
+            Next para
+
+            For idx = 1 To paraCount - 1
+                trimmedText = Trim$(sigParas(idx).Range.Text)
+                If trimmedText Like "Sincerely*" Then
+                    If LenB(Trim$(sigParas(idx + 1).Range.Text)) > 0 Then
+                        sigParas(idx + 1).Range.InsertParagraphBefore
+                    End If
+                    Exit For
+                End If
+            Next idx
+        End If
     End If
 
     On Error GoTo 0
@@ -935,6 +987,11 @@ Private Sub ConvertTextBulletsToRealBullets(ByVal doc As Document)
         If para.Range.ListFormat.ListType <> wdListNoNumbering Then
             On Error Resume Next
 
+            ' Normalize the list level and bullet formatting by reapplying the default bullet
+            para.Range.ListFormat.RemoveNumbers NumberType:=wdNumberParagraph
+            para.Range.ListFormat.ApplyBulletDefault
+            para.Range.ListFormat.ListLevelNumber = 1
+
             ' Override Word's default list formatting to remove hanging indent
             ' Bullet at left margin, text aligns vertically at BULLET_LEFT_IN
             With para.Range.ListFormat.ListTemplate.ListLevels(1)
@@ -947,6 +1004,8 @@ Private Sub ConvertTextBulletsToRealBullets(ByVal doc As Document)
             With para.Range.ParagraphFormat
                 .LeftIndent = InchesToPoints(BULLET_LEFT_IN)  ' All lines at this position
                 .FirstLineIndent = 0  ' No hanging indent - text aligns vertically
+                .TabStops.ClearAll
+                .TabStops.Add Position:=InchesToPoints(BULLET_TAB_IN)
             End With
 
             ' NEW v1.6: Story 2 - Force Calibri font for bullets
