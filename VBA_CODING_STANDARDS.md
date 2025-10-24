@@ -61,9 +61,51 @@ with open('BWS_vX.X.X.bas', 'r') as f:
 
 ---
 
+### 2. ⚠️ VARIABLE DECLARATIONS MUST BE AT FUNCTION LEVEL
+**VBA HARD RULE: All Dim statements must be at function/subroutine level**
+
+**ERROR HISTORY:**
+- ❌ v1.7.5 → v1.7.6: Dim statements inside For loop - compile error
+- Error: "Invalid outside procedure" or "Expected end of statement"
+
+**RULE:**
+- **ALL Dim statements at function level** (at the top, before any code)
+- **NEVER declare variables inside loops, If blocks, or other structures**
+- Declare all variables at the top, even if only used in a specific block
+
+**EXAMPLE - WRONG:**
+```vba
+Sub MyFunction()
+    For i = 1 To 10
+        Dim tempVar As String  ' ❌ COMPILER ERROR!
+        tempVar = "test"
+    Next i
+End Sub
+```
+
+**EXAMPLE - CORRECT:**
+```vba
+Sub MyFunction()
+    Dim tempVar As String  ' ✅ Declared at function level
+    Dim i As Long
+
+    For i = 1 To 10
+        tempVar = "test"   ' ✅ Only assignment/Set in loop
+    Next i
+End Sub
+```
+
+**VERIFICATION CHECKLIST:**
+- [ ] All Dim statements are at the top of the function
+- [ ] No Dim statements inside For/While/Do loops
+- [ ] No Dim statements inside If/Select blocks
+- [ ] No Dim statements inside With blocks
+
+---
+
 ## ORDER OF OPERATIONS MATTERS
 
-### 2. Table Formatting AFTER Global Formatting
+### 3. Table Formatting AFTER Global Formatting
 **ISSUE:** ApplyGlobalFormatting was overriding table alignment
 
 **LESSON:** Order matters in Word VBA!
@@ -83,7 +125,7 @@ FixAllTables doc              ' Table fixes AFTER (preserved)
 
 ## SIGNATURE & CONTENT CONTROL HANDLING
 
-### 3. Template Signature vs. Imported Signature
+### 4. Template Signature vs. Imported Signature
 **ISSUE:** Users kept seeing TWO signatures after import
 
 **ROOT CAUSE:**
@@ -108,7 +150,7 @@ End If
 
 ## WHITESPACE STRIPPING
 
-### 4. Empty Paragraph Detection - Beware the Paragraph Mark!
+### 5. Empty Paragraph Detection - Beware the Paragraph Mark!
 **CRITICAL ISSUE (v1.7.5):** Whitespace stripping was CREATING whitespace instead of removing it!
 
 **THREE BUGS DISCOVERED:**
@@ -181,7 +223,7 @@ StripAllWhitespace doc        ' ✅ Runs LAST - cleans up everything
 
 ## IMAGE FORMATTING
 
-### 5. InlineShapes vs. Shapes
+### 6. InlineShapes vs. Shapes
 **ISSUE:** Image formatting kept reverting to "in line with text"
 
 **LESSON:** Word has TWO shape types:
@@ -206,7 +248,7 @@ fltShp.ZOrder msoBringToFront
 
 ## CONTENT CONTROL BEST PRACTICES
 
-### 6. Finding Content Controls by Title/Tag
+### 7. Finding Content Controls by Title/Tag
 **LESSON:** Content controls can be identified multiple ways
 
 **SAFE APPROACH:**
@@ -227,7 +269,7 @@ Next cc
 
 ## ERROR HANDLING
 
-### 7. On Error Resume Next - Use Sparingly
+### 8. On Error Resume Next - Use Sparingly
 **RULE:** Only use `On Error Resume Next` for expected, non-critical errors
 
 **GOOD USE:**
@@ -265,12 +307,13 @@ Before committing ANY VBA code changes:
 ## VERSION HISTORY
 
 ### Errors Made & Fixed:
-1. **v1.7.4 → v1.7.5:** THREE critical bugs - wrong empty paragraph check (= 0 instead of <= 1), wrong deletion loop (same range 6x), wrong order (whitespace before signature deletion)
-2. **v1.7.3 → v1.7.4:** Line continuation limit exceeded (25 max)
-3. **v1.7.1 → v1.7.2:** Complex whitespace stripping failed, simplified in v1.7.3
-4. **v1.7.0 → v1.7.2:** Duplicate signatures (3 iterations to fix)
-5. **v1.6.6:** Table formatting order (FixAllTables before vs. after global)
-6. **Earlier:** Line continuation limit exceeded (first occurrence)
+1. **v1.7.5 → v1.7.6:** Dim statements inside For loop - compile error (VBA requires all Dim at function level)
+2. **v1.7.4 → v1.7.5:** THREE critical bugs - wrong empty paragraph check (= 0 instead of <= 1), wrong deletion loop (same range 6x), wrong order (whitespace before signature deletion)
+3. **v1.7.3 → v1.7.4:** Line continuation limit exceeded (25 max)
+4. **v1.7.1 → v1.7.2:** Complex whitespace stripping failed, simplified in v1.7.3
+5. **v1.7.0 → v1.7.2:** Duplicate signatures (3 iterations to fix)
+6. **v1.6.6:** Table formatting order (FixAllTables before vs. after global)
+7. **Earlier:** Line continuation limit exceeded (first occurrence)
 
 ---
 
@@ -286,6 +329,6 @@ Before committing ANY VBA code changes:
 
 ---
 
-**Last Updated:** 2025-10-24 (v1.7.5)
+**Last Updated:** 2025-10-24 (v1.7.6)
 **Maintained By:** Claude Code
 **Project:** BWS (Bridgewater Studio) Macro Development
