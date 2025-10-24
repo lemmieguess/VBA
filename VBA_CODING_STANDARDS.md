@@ -108,37 +108,74 @@ End If
 
 ## WHITESPACE STRIPPING
 
-### 4. Keep It Simple - Delete ALL Empty Paragraphs
-**ISSUE:** Complex range-based whitespace stripping failed (v1.7.1, v1.7.2)
+### 4. Empty Paragraph Detection - Beware the Paragraph Mark!
+**CRITICAL ISSUE (v1.7.5):** Whitespace stripping was CREATING whitespace instead of removing it!
 
-**LESSON:** VBA's Range object is tricky. Simple loop worked better.
+**THREE BUGS DISCOVERED:**
 
-**WRONG (Complex):**
+#### Bug #1: Wrong Empty Paragraph Check
+**ISSUE:** `Len(Trim$(para.Range.Text)) = 0` NEVER matches empty paragraphs!
+
+**WHY?** Every paragraph contains a paragraph mark (Chr(13)) with length = 1
+
+**WRONG:**
 ```vba
-' Check if paragraph is within body content range
-If para.Range.Start >= bodyCC.Range.Start And _
-   para.Range.End <= bodyCC.Range.End Then
-   ' ... complex logic that failed
+If Len(Trim$(para.Range.Text)) = 0 Then  ' ❌ NEVER TRUE for empty paragraphs!
+    para.Range.Delete
+End If
 ```
 
-**CORRECT (Simple):**
+**CORRECT:**
 ```vba
-' Just delete ALL empty paragraphs - simple!
-Do While attempts < 100
-    found = False
-    For Each para In doc.Paragraphs
-        If Len(Trim$(para.Range.Text)) = 0 Then
-            para.Range.Delete
-            found = True
-            Exit For  ' Start over after deletion
-        End If
-    Next para
-    If Not found Then Exit Do
-    attempts = attempts + 1
-Loop
+txt = para.Range.Text
+If Len(Trim$(txt)) <= 1 Then  ' ✅ Catches paragraph mark (length 1)
+    para.Range.Delete
+End If
 ```
 
-**RULE:** Prefer simple, brute-force approaches over complex range checking
+#### Bug #2: Deleting Multiple Paragraphs
+**ISSUE:** Deleting the SAME range multiple times doesn't work
+
+**WRONG:**
+```vba
+For j = 1 To 6
+    startPara.Range.Delete  ' ❌ Deleting same range 6 times!
+Next j
+```
+
+**CORRECT:**
+```vba
+' Create range spanning 6 paragraphs, delete once
+Set deleteRange = startPara.Range
+endParaIndex = startPara.Range.Paragraphs(1).Index + 5
+If endParaIndex <= doc.Paragraphs.Count Then
+    deleteRange.End = doc.Paragraphs(endParaIndex).Range.End
+End If
+deleteRange.Delete  ' ✅ Delete entire range at once
+```
+
+#### Bug #3: Order of Operations
+**ISSUE:** Whitespace stripping ran BEFORE operations that create empty paragraphs
+
+**WRONG ORDER:**
+```vba
+StripAllWhitespace doc        ' ❌ Runs too early
+FormatSignatureBlock doc      ' Creates empty paragraphs
+' Result: Empty paragraphs remain!
+```
+
+**CORRECT ORDER:**
+```vba
+FormatSignatureBlock doc      ' May create empty paragraphs
+' ... other formatting ...
+StripAllWhitespace doc        ' ✅ Runs LAST - cleans up everything
+```
+
+**RULES:**
+1. Empty paragraph check: Use `<= 1` not `= 0` (paragraph mark has length 1)
+2. Multi-paragraph deletion: Create range spanning N paragraphs, delete once
+3. Whitespace stripping: Run LAST, after all formatting that might create empty paragraphs
+4. Prefer simple, brute-force approaches over complex range checking
 
 ---
 
@@ -228,11 +265,12 @@ Before committing ANY VBA code changes:
 ## VERSION HISTORY
 
 ### Errors Made & Fixed:
-1. **v1.7.3 → v1.7.4:** Line continuation limit exceeded (25 max)
-2. **v1.7.1 → v1.7.2:** Complex whitespace stripping failed, simplified in v1.7.3
-3. **v1.7.0 → v1.7.2:** Duplicate signatures (3 iterations to fix)
-4. **v1.6.6:** Table formatting order (FixAllTables before vs. after global)
-5. **Earlier:** Line continuation limit exceeded (first occurrence)
+1. **v1.7.4 → v1.7.5:** THREE critical bugs - wrong empty paragraph check (= 0 instead of <= 1), wrong deletion loop (same range 6x), wrong order (whitespace before signature deletion)
+2. **v1.7.3 → v1.7.4:** Line continuation limit exceeded (25 max)
+3. **v1.7.1 → v1.7.2:** Complex whitespace stripping failed, simplified in v1.7.3
+4. **v1.7.0 → v1.7.2:** Duplicate signatures (3 iterations to fix)
+5. **v1.6.6:** Table formatting order (FixAllTables before vs. after global)
+6. **Earlier:** Line continuation limit exceeded (first occurrence)
 
 ---
 
@@ -248,6 +286,6 @@ Before committing ANY VBA code changes:
 
 ---
 
-**Last Updated:** 2025-10-24 (v1.7.4)
+**Last Updated:** 2025-10-24 (v1.7.5)
 **Maintained By:** Claude Code
 **Project:** BWS (Bridgewater Studio) Macro Development
