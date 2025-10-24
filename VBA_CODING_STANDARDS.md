@@ -221,9 +221,70 @@ StripAllWhitespace doc        ' ✅ Runs LAST - cleans up everything
 
 ---
 
+## RANGE & PARAGRAPH MANIPULATION
+
+### 6. Paragraph Objects Don't Have .Index Property
+**CRITICAL ISSUE (v1.7.7):** "Method or data member not found" error
+
+**ROOT CAUSE:**
+Paragraph objects in Word VBA do NOT have an .Index property!
+
+**ERROR:**
+```vba
+paraIndex = para.Range.Paragraphs(1).Index  ' ❌ .Index doesn't exist!
+```
+
+**VBA FACT:**
+Paragraph objects have properties like:
+- Range, Style, Format, Alignment, OutlineLevel
+- They do NOT have .Index to get their position
+
+**WRONG APPROACH - Using .Index:**
+```vba
+' ❌ This will cause compile error!
+paraIndex = startPara.Range.Paragraphs(1).Index
+endParaIndex = paraIndex + 5
+deleteRange.End = doc.Paragraphs(endParaIndex).Range.End
+```
+
+**CORRECT APPROACH - Using Range Methods:**
+```vba
+' ✅ Use Range.MoveEnd to extend range by N paragraphs
+Set deleteRange = startPara.Range
+deleteRange.MoveEnd Unit:=wdParagraph, Count:=5  ' Extend by 5 paragraphs
+deleteRange.Delete  ' Delete 6 paragraphs total (start + 5)
+```
+
+**USEFUL RANGE METHODS:**
+```vba
+' Extending ranges:
+rng.MoveEnd Unit:=wdParagraph, Count:=5    ' Extend end by 5 paragraphs
+rng.MoveStart Unit:=wdParagraph, Count:=2  ' Move start forward 2 paragraphs
+
+' Expanding ranges:
+rng.Expand Unit:=wdParagraph  ' Expand to include entire paragraph
+
+' Collapsing ranges:
+rng.Collapse Direction:=wdCollapseEnd  ' Collapse to end point
+```
+
+**RULES:**
+1. Paragraph objects don't have .Index property
+2. Use Range methods (MoveStart, MoveEnd, Expand) for range manipulation
+3. Range methods handle edge cases automatically (won't go past document boundaries)
+4. Range methods are simpler and more reliable than index-based approaches
+
+**BENEFITS:**
+- Cleaner code (11 lines → 1 line in v1.7.7)
+- No reliance on non-existent properties
+- Automatic boundary handling
+- More maintainable
+
+---
+
 ## IMAGE FORMATTING
 
-### 6. InlineShapes vs. Shapes
+### 7. InlineShapes vs. Shapes
 **ISSUE:** Image formatting kept reverting to "in line with text"
 
 **LESSON:** Word has TWO shape types:
@@ -248,7 +309,7 @@ fltShp.ZOrder msoBringToFront
 
 ## CONTENT CONTROL BEST PRACTICES
 
-### 7. Finding Content Controls by Title/Tag
+### 8. Finding Content Controls by Title/Tag
 **LESSON:** Content controls can be identified multiple ways
 
 **SAFE APPROACH:**
@@ -269,7 +330,7 @@ Next cc
 
 ## ERROR HANDLING
 
-### 8. On Error Resume Next - Use Sparingly
+### 9. On Error Resume Next - Use Sparingly
 **RULE:** Only use `On Error Resume Next` for expected, non-critical errors
 
 **GOOD USE:**
@@ -307,13 +368,14 @@ Before committing ANY VBA code changes:
 ## VERSION HISTORY
 
 ### Errors Made & Fixed:
-1. **v1.7.5 → v1.7.6:** Dim statements inside For loop - compile error (VBA requires all Dim at function level)
-2. **v1.7.4 → v1.7.5:** THREE critical bugs - wrong empty paragraph check (= 0 instead of <= 1), wrong deletion loop (same range 6x), wrong order (whitespace before signature deletion)
-3. **v1.7.3 → v1.7.4:** Line continuation limit exceeded (25 max)
-4. **v1.7.1 → v1.7.2:** Complex whitespace stripping failed, simplified in v1.7.3
-5. **v1.7.0 → v1.7.2:** Duplicate signatures (3 iterations to fix)
-6. **v1.6.6:** Table formatting order (FixAllTables before vs. after global)
-7. **Earlier:** Line continuation limit exceeded (first occurrence)
+1. **v1.7.6 → v1.7.7:** Paragraph.Index property doesn't exist - compile error (use Range.MoveEnd instead)
+2. **v1.7.5 → v1.7.6:** Dim statements inside For loop - compile error (VBA requires all Dim at function level)
+3. **v1.7.4 → v1.7.5:** THREE critical bugs - wrong empty paragraph check (= 0 instead of <= 1), wrong deletion loop (same range 6x), wrong order (whitespace before signature deletion)
+4. **v1.7.3 → v1.7.4:** Line continuation limit exceeded (25 max)
+5. **v1.7.1 → v1.7.2:** Complex whitespace stripping failed, simplified in v1.7.3
+6. **v1.7.0 → v1.7.2:** Duplicate signatures (3 iterations to fix)
+7. **v1.6.6:** Table formatting order (FixAllTables before vs. after global)
+8. **Earlier:** Line continuation limit exceeded (first occurrence)
 
 ---
 
@@ -329,6 +391,6 @@ Before committing ANY VBA code changes:
 
 ---
 
-**Last Updated:** 2025-10-24 (v1.7.6)
+**Last Updated:** 2025-10-24 (v1.7.7)
 **Maintained By:** Claude Code
 **Project:** BWS (Bridgewater Studio) Macro Development
