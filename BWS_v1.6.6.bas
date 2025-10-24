@@ -566,12 +566,19 @@ Private Sub ImportDocument(ByVal sourcePath As String)
     Dim doc As Document
     Dim bodyCC As ContentControl
     Dim insertRng As Range
+    Dim originalAlerts As Long
 
     Set doc = ActiveDocument
     If doc Is Nothing Then
         MsgBox "No active document.", vbExclamation, "BWS"
         Exit Sub
     End If
+
+    ' Disable alerts to suppress template save prompts
+    originalAlerts = Application.DisplayAlerts
+    Application.DisplayAlerts = wdAlertsNone
+
+    On Error GoTo ErrorHandler
 
     StatusMessage "Importing " & sourcePath & "..."
 
@@ -632,8 +639,17 @@ Private Sub ImportDocument(ByVal sourcePath As String)
     End If
     On Error GoTo 0
 
+    ' Restore alerts
+    Application.DisplayAlerts = originalAlerts
+
     StatusMessage Ver() & " - Import complete"
     MsgBox "Import complete!", vbInformation, "BWS"
+    Exit Sub
+
+ErrorHandler:
+    ' Restore alerts even on error
+    Application.DisplayAlerts = originalAlerts
+    MsgBox "Import error: " & Err.Description, vbCritical, "BWS"
 End Sub
 
 ' ============================================================================
