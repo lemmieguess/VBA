@@ -659,8 +659,8 @@ End Sub
 Private Sub FormatSignatureBlock(ByVal doc As Document)
     ' Story 1: Detect signature block and preserve it
     ' Looks for "Sincerely", "Best regards", "Regards" (case-insensitive)
-    ' Processes that line + next 3 lines
-    ' ONLY fixes image wrapping, does NOT apply formatting changes
+    ' Adds spacing after greeting, fixes image wrapping to be behind text
+    ' ONLY fixes image positioning, does NOT apply other formatting changes
 
     Dim para As Paragraph
     Dim txt As String
@@ -669,6 +669,7 @@ Private Sub FormatSignatureBlock(ByVal doc As Document)
     Dim i As Long
     Dim shp As InlineShape
     Dim fltShp As Shape
+    Dim rng As Range
 
     On Error Resume Next
 
@@ -686,23 +687,28 @@ Private Sub FormatSignatureBlock(ByVal doc As Document)
         End If
     Next para
 
-    ' If found, process signature line + next 3 lines (but don't apply formatting)
+    ' If found, add spacing and fix image positioning
     If Not sigStart Is Nothing Then
+        ' Add two blank lines after "Sincerely" (before next paragraph)
+        Set rng = sigStart.Range
+        rng.Collapse wdCollapseEnd
+        rng.InsertAfter vbCr & vbCr
+
         lineCount = 0
         For i = sigStart.Range.Start To doc.Range.End
             Set para = doc.Range(i, i + 1).Paragraphs(1)
             If para.Range.Start >= sigStart.Range.Start Then
-                ' ONLY fix image wrapping - don't change indents, spacing, etc.
+                ' ONLY fix image wrapping - position BEHIND text (not in front)
                 For Each shp In para.Range.InlineShapes
                     If shp.Type = wdInlineShapePicture Or shp.Type = wdInlineShapeLinkedPicture Then
                         Set fltShp = shp.ConvertToShape
                         fltShp.WrapFormat.Type = wdWrapFront
-                        fltShp.ZOrder msoBringToFront
+                        fltShp.ZOrder msoSendToBack  ' Send BEHIND text so it doesn't obscure
                     End If
                 Next shp
 
                 lineCount = lineCount + 1
-                If lineCount > 3 Then Exit For
+                If lineCount > 5 Then Exit For  ' Increased from 3 to account for added lines
             End If
         Next i
     End If
