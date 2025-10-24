@@ -5,6 +5,11 @@ Option Explicit
 ' Bridgewater Studio - BWS v1.6.6 - User Feedback Fixes
 ' Based on: v1.6.5 with three critical user-reported fixes
 '
+' v1.6.6.1 FIX:
+' - Suppress template save prompt: Set AttachedTemplate.Saved = True
+'   Prevents "save changes to BWS letterhead template?" dialog
+'   Caused by ApplyHeaderStyles applying "BWS Header" style from template
+'
 ' v1.6.6 FIXES:
 ' - Fixed signature block: Reverted to v1.6.4 approach, removed formatting ops
 '   Keeps all signature content (Sincerely + 3 lines), only fixes image wrapping
@@ -619,6 +624,13 @@ Private Sub ImportDocument(ByVal sourcePath As String)
     If bulletsEnabled = "Yes" Then
         ConvertTextBulletsToRealBullets doc
     End If
+
+    ' Mark template as unmodified to prevent "save changes to template?" prompt
+    On Error Resume Next
+    If Not doc.AttachedTemplate Is Nothing Then
+        doc.AttachedTemplate.Saved = True
+    End If
+    On Error GoTo 0
 
     StatusMessage Ver() & " - Import complete"
     MsgBox "Import complete!", vbInformation, "BWS"
