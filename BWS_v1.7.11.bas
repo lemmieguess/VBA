@@ -1504,11 +1504,11 @@ End Function
 Private Function ExtractValue(ByVal doc As Document, ByVal keyLabel As String) As String
     Dim rng As Range
     Dim txt As String, pos As Long
-    Dim after As String, eol As Long
     Set rng = doc.Content
     txt = rng.Text
     pos = InStr(1, txt, keyLabel, vbTextCompare)
     If pos > 0 Then
+        Dim after As String, eol As Long
         after = Mid$(txt, pos + Len(keyLabel))
         eol = InStr(after, vbCr)
         If eol = 0 Then eol = Len(after) + 1
