@@ -149,8 +149,8 @@ def check_version_consistency(lines):
     versions_found = {}
 
     for i, line in enumerate(lines, 1):
-        # Check BWS_VERSION constant
-        if 'BWS_VERSION' in line and '=' in line:
+        # Check BWS_VERSION constant (must be a Const declaration, not just any use)
+        if 'Const BWS_VERSION' in line and '=' in line:
             match = re.search(r'"([^"]+)"', line)
             if match:
                 versions_found['BWS_VERSION'] = (match.group(1), i)
