@@ -2,8 +2,19 @@ Attribute VB_Name = "BWS_Module"
 Option Explicit
 
 ' ============================================================================
-' Bridgewater Studio - BWS v1.7.12 - Normal.dotm Toolbar Fix
-' Based on: v1.7.11 with AutoOpen toolbar duplication fix
+' Bridgewater Studio - BWS v1.7.13 - Table Indent & Image Preservation Fix
+' Based on: v1.7.12 with table formatting and signature image fixes
+'
+' v1.7.13 CRITICAL FIXES:
+' - Fixed table indentation: Added RightIndent = 0 for table rows and cells
+'   Problem: Tables had negative right indent (-0.25") after import
+'   Solution: Explicitly set RightIndent = 0 for both table.Rows and each cell
+' - Fixed table cell spacing: Added SpaceBefore = 0 and SpaceAfter = 0 for all cells
+'   Ensures consistent zero spacing in all table cells
+' - Fixed signature image deletion in StripAllWhitespace
+'   Problem: Signature images were deleted during whitespace cleanup
+'   Solution: Check para.Range.InlineShapes.Count > 0 before deleting paragraphs
+'   Paragraphs containing images are now preserved
 '
 ' v1.7.12 CRITICAL FIX:
 ' - Fixed toolbar duplication when installed in Normal.dotm
@@ -98,7 +109,7 @@ Option Explicit
 ' -------- Versioning / App Keys --------
 Private Const BWS_APP_NAME As String = "BridgewaterStudio"
 Private Const BWS_APP_SECTION As String = "BWS"
-Public  Const BWS_VERSION   As String = "v1.7.12"
+Public  Const BWS_VERSION   As String = "v1.7.13"
 
 ' -------- Registry Keys --------
 Private Const BWS_REG_APP As String = "BridgewaterStudio"
@@ -195,7 +206,7 @@ Public Sub BWS_Install()
 
     ' If no existing settings or user chose to reconfigure
     If Not useExisting Then
-        MsgBox "Welcome to BWS v1.7.12 Installer!" & vbCrLf & vbCrLf & _
+        MsgBox "Welcome to BWS v1.7.13 Installer!" & vbCrLf & vbCrLf & _
                "You'll be prompted to select:" & vbCrLf & _
                "1. Base folder (Dropbox root)" & vbCrLf & _
                "2. Template file (.dotm/.dotx)" & vbCrLf & vbCrLf & _
@@ -1004,10 +1015,12 @@ End Sub
 Private Sub StripAllWhitespace(ByVal doc As Document)
     ' Aggressively strip ALL empty paragraphs from entire document
     ' Simple approach: keep looping and deleting until no more empty paragraphs
+    ' NEW v1.7.13: Don't delete paragraphs that contain images (InlineShapes)
     Dim para As Paragraph
     Dim found As Boolean
     Dim attempts As Long
     Dim txt As String
+    Dim hasImages As Boolean
 
     On Error Resume Next
 
@@ -1020,9 +1033,18 @@ Private Sub StripAllWhitespace(ByVal doc As Document)
             ' Empty paragraph = just paragraph mark (Chr(13)) or whitespace + paragraph mark
             ' So check if trimmed length <= 1 (paragraph mark only)
             If Len(Trim$(txt)) <= 1 Then
-                para.Range.Delete
-                found = True
-                Exit For  ' Start over after deletion
+                ' NEW v1.7.13: Check if paragraph contains images before deleting
+                hasImages = False
+                If para.Range.InlineShapes.Count > 0 Then
+                    hasImages = True
+                End If
+
+                ' Only delete if paragraph doesn't contain images
+                If Not hasImages Then
+                    para.Range.Delete
+                    found = True
+                    Exit For  ' Start over after deletion
+                End If
             End If
         Next para
         If Not found Then Exit Do  ' No more empty paragraphs
@@ -1058,6 +1080,7 @@ Private Sub FormatTable(ByVal t As Table)
 
     ' CRITICAL: Table alignment and width (from BWS_LESSONS_LEARNED)
     t.Rows.LeftIndent = 0  ' THE critical line!
+    t.Rows.RightIndent = 0  ' NEW v1.7.13: Also zero right indent
     t.Rows.Alignment = wdAlignRowLeft
     t.PreferredWidthType = wdPreferredWidthPercent
     t.PreferredWidth = 100
@@ -1102,7 +1125,10 @@ Private Sub FormatTable(ByVal t As Table)
             On Error Resume Next
             With t.Cell(r, c).Range.ParagraphFormat
                 .LeftIndent = 0
+                .RightIndent = 0  ' NEW v1.7.13: Zero right indent
                 .FirstLineIndent = 0
+                .SpaceBefore = 0  ' NEW v1.7.13: Zero spacing before
+                .SpaceAfter = 0   ' NEW v1.7.13: Zero spacing after
                 If isCurrency Then
                     .Alignment = wdAlignParagraphRight
                 Else
@@ -1604,7 +1630,7 @@ Private Sub BuildOrRefreshBWSToolbar(ByVal showMessage As Boolean)
     AddBtn cb3, "About", "BWS_About", 487, False, MSO_BUTTON_ICON_AND_CAPTION, "Version info"
 
     If showMessage Then
-        MsgBox "BWS v1.7.12 toolbar installed!" & vbCrLf & vbCrLf & _
+        MsgBox "BWS v1.7.13 toolbar installed!" & vbCrLf & vbCrLf & _
                "3 persistent rows created." & vbCrLf & _
                "Toolbar will survive Word restart.", vbInformation, "BWS"
     End If
@@ -1640,21 +1666,22 @@ Public Sub BWS_About()
     Dim msg3 As String
 
     ' Build message in parts to avoid VBA's 25-line-continuation limit
-    ' Part 1: Header and recent versions (v1.7.12, v1.7.11, v1.7.10)
-    msg = "================ BWS v1.7.12 =================" & vbCrLf _
+    ' Part 1: Header and recent versions (v1.7.13, v1.7.12, v1.7.11)
+    msg = "================ BWS v1.7.13 =================" & vbCrLf _
         & "Version: " & BWS_VERSION & vbCrLf _
         & "Host:    " & Application.Name & " " & Application.Version & vbCrLf _
         & vbCrLf _
-        & "NEW in v1.7.12:" & vbCrLf _
+        & "NEW in v1.7.13:" & vbCrLf _
+        & "• Fixed table indent: RightIndent = 0" & vbCrLf _
+        & "• Fixed cell spacing: Before/After = 0" & vbCrLf _
+        & "• Fixed signature image preservation" & vbCrLf _
+        & vbCrLf _
+        & "From v1.7.12:" & vbCrLf _
         & "• Fixed toolbar duplication in Normal.dotm" & vbCrLf _
         & "• AutoOpen now checks if toolbars exist" & vbCrLf _
         & vbCrLf _
         & "From v1.7.11:" & vbCrLf _
-        & "• Fixed Dim in ExtractValue (inside If block)" & vbCrLf _
-        & "• Added automated validation workflow" & vbCrLf _
-        & vbCrLf _
-        & "From v1.7.10:" & vbCrLf _
-        & "• Fixed Dim inside loop (again!)" & vbCrLf
+        & "• Fixed Dim in ExtractValue (inside If block)" & vbCrLf
 
     ' Part 2: Older versions (v1.6.6, v1.6.5)
     msg2 = vbCrLf _
