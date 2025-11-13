@@ -1091,6 +1091,12 @@ Private Sub FormatTable(ByVal t As Table)
     t.LeftPadding = Application.CentimetersToPoints(0.15)
     t.RightPadding = Application.CentimetersToPoints(0.15)
 
+    ' NEW v1.7.13: Zero out table-level indents
+    On Error Resume Next
+    t.Range.ParagraphFormat.LeftIndent = 0
+    t.Range.ParagraphFormat.RightIndent = 0
+    On Error GoTo 0
+
     ' NEW v1.6: Story 4 - Header formatting with #D9D9D9 gray and bold text
     If t.Rows.Count >= 1 Then
         With t.Rows(1)
