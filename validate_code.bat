@@ -8,9 +8,9 @@ echo          BWS VBA Code Validator
 echo ============================================================
 echo.
 
-REM Find the latest BWS version file by modification date
+REM Find the latest BWS version file by modification date (newest first)
 set LATEST_FILE=
-for /f "delims=" %%f in ('dir /b /o-d BWS_v1.7.*.bas 2^>nul') do (
+for /f "delims=" %%f in ('dir /b /o:-d BWS_v1.7.*.bas 2^>nul') do (
     if not defined LATEST_FILE set LATEST_FILE=%%f
 )
 
