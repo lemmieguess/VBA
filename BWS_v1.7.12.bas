@@ -2,8 +2,17 @@ Attribute VB_Name = "BWS_Module"
 Option Explicit
 
 ' ============================================================================
-' Bridgewater Studio - BWS v1.7.11 - Variable Declaration Fix
-' Based on: v1.7.10 with Dim placement correction
+' Bridgewater Studio - BWS v1.7.12 - Normal.dotm Toolbar Fix
+' Based on: v1.7.11 with AutoOpen toolbar duplication fix
+'
+' v1.7.12 CRITICAL FIX:
+' - Fixed toolbar duplication when installed in Normal.dotm
+'   Problem: AutoOpen runs every time a document opens, recreating toolbars
+'   Solution: Added BWS_ToolbarsExist() check to skip recreation if toolbars exist
+'   BuildOrRefreshBWSToolbar now only recreates when:
+'   * Toolbars don't exist yet, OR
+'   * Explicitly requested via BWS_Install/BWS_InstallToolbar (showMessage=True)
+'   This prevents multiple toolbar instances in Normal.dotm scenario
 '
 ' v1.7.11 CRITICAL FIX:
 ' - Fixed Dim statement inside If block in ExtractValue function (line 1472)
@@ -89,7 +98,7 @@ Option Explicit
 ' -------- Versioning / App Keys --------
 Private Const BWS_APP_NAME As String = "BridgewaterStudio"
 Private Const BWS_APP_SECTION As String = "BWS"
-Public  Const BWS_VERSION   As String = "v1.7.11"
+Public  Const BWS_VERSION   As String = "v1.7.12"
 
 ' -------- Registry Keys --------
 Private Const BWS_REG_APP As String = "BridgewaterStudio"
@@ -186,7 +195,7 @@ Public Sub BWS_Install()
 
     ' If no existing settings or user chose to reconfigure
     If Not useExisting Then
-        MsgBox "Welcome to BWS v1.7.3 Installer!" & vbCrLf & vbCrLf & _
+        MsgBox "Welcome to BWS v1.7.12 Installer!" & vbCrLf & vbCrLf & _
                "You'll be prompted to select:" & vbCrLf & _
                "1. Base folder (Dropbox root)" & vbCrLf & _
                "2. Template file (.dotm/.dotx)" & vbCrLf & vbCrLf & _
@@ -1526,10 +1535,37 @@ Public Sub BWS_RemoveToolbar()
     Application.CommandBars("BWS-3").Delete
 End Sub
 
+Private Function BWS_ToolbarsExist() As Boolean
+    ' Check if all 3 BWS toolbars exist and are valid
+    Dim exists As Boolean
+    On Error Resume Next
+    exists = False
+
+    ' Check if all 3 toolbars exist
+    If Not Application.CommandBars("BWS-1") Is Nothing Then
+        If Not Application.CommandBars("BWS-2") Is Nothing Then
+            If Not Application.CommandBars("BWS-3") Is Nothing Then
+                exists = True
+            End If
+        End If
+    End If
+
+    On Error GoTo 0
+    BWS_ToolbarsExist = exists
+End Function
+
 Private Sub BuildOrRefreshBWSToolbar(ByVal showMessage As Boolean)
     Dim cb1 As CommandBar
     Dim cb2 As CommandBar
     Dim cb3 As CommandBar
+
+    ' NEW v1.7.12: Check if toolbars already exist
+    ' Only recreate if they don't exist OR if explicitly requested (showMessage=True)
+    ' This prevents duplicate toolbars when macros are in Normal.dotm
+    If BWS_ToolbarsExist() And Not showMessage Then
+        ' Toolbars already exist and this is an AutoOpen call, skip recreation
+        Exit Sub
+    End If
 
     ' Remove old toolbars
     On Error Resume Next
@@ -1568,7 +1604,7 @@ Private Sub BuildOrRefreshBWSToolbar(ByVal showMessage As Boolean)
     AddBtn cb3, "About", "BWS_About", 487, False, MSO_BUTTON_ICON_AND_CAPTION, "Version info"
 
     If showMessage Then
-        MsgBox "BWS v1.7.3 toolbar installed!" & vbCrLf & vbCrLf & _
+        MsgBox "BWS v1.7.12 toolbar installed!" & vbCrLf & vbCrLf & _
                "3 persistent rows created." & vbCrLf & _
                "Toolbar will survive Word restart.", vbInformation, "BWS"
     End If
@@ -1604,12 +1640,16 @@ Public Sub BWS_About()
     Dim msg3 As String
 
     ' Build message in parts to avoid VBA's 25-line-continuation limit
-    ' Part 1: Header and recent versions (v1.7.11, v1.7.10, v1.7.9)
-    msg = "================ BWS v1.7.11 =================" & vbCrLf _
+    ' Part 1: Header and recent versions (v1.7.12, v1.7.11, v1.7.10)
+    msg = "================ BWS v1.7.12 =================" & vbCrLf _
         & "Version: " & BWS_VERSION & vbCrLf _
         & "Host:    " & Application.Name & " " & Application.Version & vbCrLf _
         & vbCrLf _
-        & "NEW in v1.7.11:" & vbCrLf _
+        & "NEW in v1.7.12:" & vbCrLf _
+        & "• Fixed toolbar duplication in Normal.dotm" & vbCrLf _
+        & "• AutoOpen now checks if toolbars exist" & vbCrLf _
+        & vbCrLf _
+        & "From v1.7.11:" & vbCrLf _
         & "• Fixed Dim in ExtractValue (inside If block)" & vbCrLf _
         & "• Added automated validation workflow" & vbCrLf _
         & vbCrLf _
