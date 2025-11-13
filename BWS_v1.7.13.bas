@@ -2,15 +2,8 @@ Attribute VB_Name = "BWS_Module"
 Option Explicit
 
 ' ============================================================================
-' Bridgewater Studio - BWS v1.7.14 - Signature Block Protection Fix
-' Based on: v1.7.13 with table formatting and signature image fixes
-'
-' v1.7.14 CRITICAL FIX:
-' - Fixed signature image deletion during formatting
-'   Problem: ApplyGlobalFormatting was applying to ENTIRE document (doc.Range)
-'   Solution: Apply formatting ONLY to body content control, NOT signature block
-'   Signature block is now completely untouched by global formatting
-'   Benefits: Signature images preserved, signature formatting maintained
+' Bridgewater Studio - BWS v1.7.13 - Table Indent & Image Preservation Fix
+' Based on: v1.7.12 with table formatting and signature image fixes
 '
 ' v1.7.13 CRITICAL FIXES:
 ' - Fixed table indentation: Added RightIndent = 0 for table rows and cells
@@ -116,7 +109,7 @@ Option Explicit
 ' -------- Versioning / App Keys --------
 Private Const BWS_APP_NAME As String = "BridgewaterStudio"
 Private Const BWS_APP_SECTION As String = "BWS"
-Public  Const BWS_VERSION   As String = "v1.7.14"
+Public  Const BWS_VERSION   As String = "v1.7.13"
 
 ' -------- Registry Keys --------
 Private Const BWS_REG_APP As String = "BridgewaterStudio"
@@ -213,7 +206,7 @@ Public Sub BWS_Install()
 
     ' If no existing settings or user chose to reconfigure
     If Not useExisting Then
-        MsgBox "Welcome to BWS v1.7.14 Installer!" & vbCrLf & vbCrLf & _
+        MsgBox "Welcome to BWS v1.7.13 Installer!" & vbCrLf & vbCrLf & _
                "You'll be prompted to select:" & vbCrLf & _
                "1. Base folder (Dropbox root)" & vbCrLf & _
                "2. Template file (.dotm/.dotx)" & vbCrLf & vbCrLf & _
@@ -1246,33 +1239,18 @@ Public Sub BWS_ApplyFormatting()
 End Sub
 
 Private Sub ApplyGlobalFormatting(ByVal doc As Document)
-    Dim bodyCC As ContentControl
-    Dim formatRange As Range
-    Dim useFont As String
-
     On Error Resume Next
 
     ' Check if Roboto is available
+    Dim useFont As String
     If FontExists(FONT_NAME_PREF) Then
         useFont = FONT_NAME_PREF
     Else
         useFont = "Calibri"
     End If
 
-    ' NEW v1.7.14: Apply formatting ONLY to body content, NOT signature block
-    ' Find body content control
-    Set bodyCC = FindBodyContentControl(doc, False)
-
-    If Not bodyCC Is Nothing Then
-        ' Format only the body content control range
-        Set formatRange = bodyCC.Range
-    Else
-        ' Fallback: format whole document if no body content control found
-        Set formatRange = doc.Range
-    End If
-
-    ' Apply formatting to the determined range (body content only)
-    With formatRange
+    ' Apply to whole document
+    With doc.Range
         .Font.Name = useFont
         .Font.Size = FONT_SIZE_PREF
         .ParagraphFormat.LeftIndent = 0
@@ -1283,7 +1261,7 @@ Private Sub ApplyGlobalFormatting(ByVal doc As Document)
         .ParagraphFormat.LineSpacing = 13.8  ' 276 twips = 1.15x spacing (matches reference)
     End With
 
-    ' NEW v1.6: Story 6 - Apply header styles (only in body content)
+    ' NEW v1.6: Story 6 - Apply header styles
     ApplyHeaderStyles doc
 
     On Error GoTo 0
@@ -1657,7 +1635,7 @@ Private Sub BuildOrRefreshBWSToolbar(ByVal showMessage As Boolean)
     AddBtn cb3, "About", "BWS_About", 487, False, MSO_BUTTON_ICON_AND_CAPTION, "Version info"
 
     If showMessage Then
-        MsgBox "BWS v1.7.14 toolbar installed!" & vbCrLf & vbCrLf & _
+        MsgBox "BWS v1.7.13 toolbar installed!" & vbCrLf & vbCrLf & _
                "3 persistent rows created." & vbCrLf & _
                "Toolbar will survive Word restart.", vbInformation, "BWS"
     End If
@@ -1693,22 +1671,22 @@ Public Sub BWS_About()
     Dim msg3 As String
 
     ' Build message in parts to avoid VBA's 25-line-continuation limit
-    ' Part 1: Header and recent versions (v1.7.14, v1.7.13, v1.7.12)
-    msg = "================ BWS v1.7.14 =================" & vbCrLf _
+    ' Part 1: Header and recent versions (v1.7.13, v1.7.12, v1.7.11)
+    msg = "================ BWS v1.7.13 =================" & vbCrLf _
         & "Version: " & BWS_VERSION & vbCrLf _
         & "Host:    " & Application.Name & " " & Application.Version & vbCrLf _
         & vbCrLf _
-        & "NEW in v1.7.14:" & vbCrLf _
-        & "• Signature block protection" & vbCrLf _
-        & "• Formatting now ONLY affects body content" & vbCrLf _
-        & "• Signature images fully preserved" & vbCrLf _
-        & vbCrLf _
-        & "From v1.7.13:" & vbCrLf _
+        & "NEW in v1.7.13:" & vbCrLf _
         & "• Fixed table indent: RightIndent = 0" & vbCrLf _
         & "• Fixed cell spacing: Before/After = 0" & vbCrLf _
+        & "• Fixed signature image preservation" & vbCrLf _
         & vbCrLf _
         & "From v1.7.12:" & vbCrLf _
-        & "• Fixed toolbar duplication in Normal.dotm" & vbCrLf
+        & "• Fixed toolbar duplication in Normal.dotm" & vbCrLf _
+        & "• AutoOpen now checks if toolbars exist" & vbCrLf _
+        & vbCrLf _
+        & "From v1.7.11:" & vbCrLf _
+        & "• Fixed Dim in ExtractValue (inside If block)" & vbCrLf
 
     ' Part 2: Older versions (v1.6.6, v1.6.5)
     msg2 = vbCrLf _
